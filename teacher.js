@@ -23,7 +23,7 @@
   async function api(path) {
     let res;
     try {
-      res = await fetch(API + path, { headers: { Authorization: `Bearer ${pw}` } });
+      res = await fetch(API + path, { cache: "no-store", headers: { Authorization: `Bearer ${pw}` } });
     } catch {
       throw new Error("連不上伺服器。");
     }

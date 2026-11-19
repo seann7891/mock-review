@@ -38,6 +38,7 @@
     try {
       res = await fetch(API + path, {
         method,
+        cache: "no-store",
         headers: { "Content-Type": "application/json", ...(S.session ? { Authorization: `Bearer ${S.session.token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined,
       });
