@@ -133,7 +133,7 @@
   }
 
   // ---------- 首頁：選錯題 ----------
-  async function viewHome() {
+  async function viewHome(justSaved) {
     app.replaceChildren(h("p", { class: "muted" }, "載入中…"));
     try {
       await loadExam(S.exam || S.session.exams[0]);
@@ -173,7 +173,7 @@
       const done = busy(saveBtn, "儲存中…");
       try {
         await api("/api/wrong", { method: "PUT", body: { exam: S.exam, qids: [...selected] } });
-        await viewHome();
+        await viewHome(true);
       } catch (ex) {
         alert(ex.message);
         done();
@@ -197,6 +197,7 @@
         }))
       : h("p", { class: "muted" }, "還沒有儲存錯題。先在上面點選題號，再按「儲存錯題」。");
 
+    const listTitle = h("h2", {}, "二、逐題診斷");
     const doneCount = S.state.attempts.filter((a) => a.done).length;
     app.replaceChildren(
       tabs,
@@ -204,7 +205,8 @@
       h("p", { class: "muted" }, "猜對的題目也建議點進來——猜對不代表會。"),
       legend, grid,
       h("div", { class: "row savebar" }, count, h("span", { class: "spacer" }), saveBtn),
-      h("h2", {}, "二、逐題診斷"),
+      listTitle,
+      justSaved ? h("p", { class: "tag ok", role: "status" }, wrongQs.length ? `已儲存 ${wrongQs.length} 題錯題，從下面第一題按「開始」` : "已儲存（目前沒有選任何錯題）") : "",
       list,
       h("h2", {}, "三、我的弱點與學習計劃"),
       doneCount
@@ -213,6 +215,10 @@
             h("button", { class: "primary", onclick: () => (location.hash = "#plan") }, S.state.plan ? "查看學習計劃" : "查看弱點分析"))
         : h("p", { class: "muted" }, "完成至少一題的診斷後，這裡會出現你的弱點分析。")
     );
+    if (justSaved) {
+      listTitle.style.scrollMarginTop = "4.5rem";
+      listTitle.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   // ---------- 單題診斷 ----------
