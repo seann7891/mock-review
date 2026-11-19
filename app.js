@@ -3,8 +3,8 @@
   const API = window.API_BASE;
   const app = document.getElementById("app");
   const SUBJECT_CLASS = { 物理: "phy", 化學: "chem", 生物: "bio", 地球科學: "earth" };
-  const STATUS_MARK = { pass: "✓", partial: "△", fail: "✕", untested: "" };
-  const STATUS_LABEL = { pass: "通過", partial: "部分通過", fail: "未通過", untested: "未檢核" };
+  const STATUS_MARK = { pass: "✓", partial: "△", fail: "✕", untested: "", untaught: "…" };
+  const STATUS_LABEL = { pass: "通過", partial: "部分通過", fail: "未通過", untested: "未檢核", untaught: "尚未教到" };
 
   const store = {
     get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -75,6 +75,7 @@
     ]);
     S.questions[exam] = qs.questions;
     S.state = st;
+    if (st.causes) Object.assign(S.session, { causes: st.causes, situations: st.situations });
   }
 
   function busy(btn, text) {
@@ -475,7 +476,8 @@
           h("ul", {}, w.tasks.map((t) => h("li", {}, t))),
           h("p", { class: "muted" }, `自我檢核：${w.check}`))),
         p.habits.length ? h("div", {}, h("h3", {}, "考場作答習慣"), h("ul", {}, p.habits.map((s) => h("li", {}, s)))) : null,
-        p.retest.length ? h("div", {}, h("h3", {}, "三週後重做"), h("p", {}, p.retest.map((x) => (/^\d+$/.test(x) ? `第 ${x} 題` : x)).join("、"))) : null));
+        p.retest.length ? h("div", {}, h("h3", {}, "三週後重做"), h("p", {}, p.retest.map((x) => (/^\d+$/.test(x) ? `第 ${x} 題` : x)).join("、"))) : null,
+        p.later?.length ? h("div", {}, h("h3", {}, "學校還沒教到，教過後再回來做"), h("ul", {}, p.later.map((s) => h("li", {}, s)))) : null));
     }
     renderPlan();
 
@@ -484,7 +486,7 @@
       ? h("div", { class: "card" }, h("h3", { style: "margin-top:0" }, "逐題診斷"),
           doneSorted.map(({ a, q }) => h("div", { class: "qsum" },
             h("div", {}, h("strong", {}, `第 ${q.number} 題 `), subjectTag(q.subject), ` ${q.topic}`),
-            h("div", { class: "row" }, [...new Set(a.causes.map((c) => c.code))].map((c) => h("span", { class: "tag bad" }, causes[c]?.label || c))),
+            h("div", { class: "row" }, [...new Set(a.causes.map((c) => c.code))].map((c) => h("span", { class: c === "untaught" ? "tag" : "tag bad" }, causes[c]?.label || c))),
             h("p", {}, a.summary))))
       : null;
 
@@ -498,6 +500,7 @@
         L.push("■ 整體診斷", p.overview, "", "■ 優先處理的弱點", ...p.weaknesses.map((w, i) => `${i + 1}. ${w.title}（${w.kind}）\n   ${w.fix}`), "");
         for (const w of p.weeks) L.push(`■ 第 ${w.week} 週：${w.focus}`, ...w.tasks.map((t) => `□ ${t}`), `自我檢核：${w.check}`, "");
         if (p.habits.length) L.push("■ 考場作答習慣", ...p.habits.map((x) => `・${x}`), "");
+        if (p.later?.length) L.push("■ 學校還沒教到，教過後再回來做", ...p.later.map((x) => `・${x}`), "");
       }
       return L.join("\n");
     }

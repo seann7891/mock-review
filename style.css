@@ -121,6 +121,7 @@ label { display: block; font-size: 14px; color: var(--muted); margin: 10px 0 4px
 }
 .step-dot.pass { background: var(--ok); border-color: var(--ok); color: #fff; }
 .step-dot.partial { background: var(--warn); border-color: var(--warn); color: #fff; }
+.step-dot.untaught { background: var(--line); border-style: dashed; }
 .step-dot.fail { background: var(--bad); border-color: var(--bad); color: #fff; }
 
 /* 對話 */

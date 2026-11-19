@@ -3,7 +3,7 @@
   const API = window.API_BASE;
   const app = document.getElementById("app");
   const SUBJECT_CLASS = { 物理: "phy", 化學: "chem", 生物: "bio", 地球科學: "earth" };
-  const STATUS = { pass: "✓ 通過", partial: "△ 部分", fail: "✕ 未通過", untested: "－ 未檢核" };
+  const STATUS = { pass: "✓ 通過", partial: "△ 部分", fail: "✕ 未通過", untested: "－ 未檢核", untaught: "… 尚未教到" };
   let pw = sessionStorage.getItem("mr.teacher") || "";
   let exam = null;
   let data = null;
@@ -145,7 +145,7 @@
         return h("details", { class: "card" },
           h("summary", {}, h("strong", {}, `第 ${q.number} 題 `), tag(q.subject), ` ${q.topic}　`,
             a.done ? h("span", { class: "tag ok" }, "已完成") : h("span", { class: "tag warn" }, "進行中"), " ",
-            [...new Set(a.causes.map((c) => c.code))].map((c) => h("span", { class: "tag bad", style: "margin-right:4px" }, causeLabel(c)))),
+            [...new Set(a.causes.map((c) => c.code))].map((c) => h("span", { class: c === "untaught" ? "tag" : "tag bad", style: "margin-right:4px" }, causeLabel(c)))),
           h("p", { class: "muted" }, `學生作答：${a.chosen || "—"}｜正確答案：${q.type === "open" ? "（非選）" : q.answer.join("")}｜對話 ${a.turns} 輪`),
           a.summary ? h("p", {}, h("strong", {}, "診斷："), a.summary) : null,
           h("p", { class: "muted" }, a.steps.map((s) => `步驟${s.n} ${STATUS[s.status]}`).join("　")),
