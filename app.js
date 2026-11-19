@@ -133,7 +133,7 @@
   }
 
   // ---------- 首頁：選錯題 ----------
-  async function viewHome(justSaved) {
+  async function viewHome() {
     app.replaceChildren(h("p", { class: "muted" }, "載入中…"));
     try {
       await loadExam(S.exam || S.session.exams[0]);
@@ -141,20 +141,56 @@
       app.replaceChildren(h("p", { class: "error" }, ex.message));
       return;
     }
-    const qs = S.questions[S.exam];
+    const exam = S.exam;
+    const qs = S.questions[exam];
     const selected = new Set(S.state.wrong);
-    let dirty = false;
 
     const tabs = h("div", { class: "tabs", role: "tablist" },
       S.session.exams.map((e) =>
-        h("button", { role: "tab", "aria-selected": String(e === S.exam), onclick: async () => { S.exam = e; await viewHome(); } }, `第 ${e} 次模擬考`)));
+        h("button", { role: "tab", "aria-selected": String(e === exam), onclick: async () => { await saving; S.exam = e; await viewHome(); } }, `第 ${e} 次模擬考`)));
 
-    const saveBtn = h("button", { class: "primary" }, "儲存錯題");
-    const count = h("span", { class: "muted" });
-    const refreshCount = () => {
-      count.textContent = `已選 ${selected.size} 題${dirty ? "（尚未儲存）" : ""}`;
-      saveBtn.disabled = !dirty;
+    // 點題號就自動儲存：請求排成一列依序送出，每次都送當下最新的整份清單。
+    const status = h("span", { class: "muted", role: "status" });
+    const listBox = h("div");
+    const listTitle = h("h2", {}, "二、逐題診斷");
+    listTitle.style.scrollMarginTop = "4.5rem";
+    const goBtn = h("button", { class: "primary", onclick: () => listTitle.scrollIntoView({ behavior: "smooth", block: "start" }) }, "往下開始診斷 ↓");
+    let saving = Promise.resolve();
+    let pending = 0;
+    const setStatus = (text, isError) => {
+      status.className = isError ? "error" : "muted";
+      status.textContent = `已選 ${selected.size} 題${text ? "・" + text : ""}`;
+      goBtn.disabled = selected.size === 0;
     };
+    const save = () => {
+      pending++;
+      setStatus("儲存中…");
+      saving = saving.then(async () => {
+        try {
+          await api("/api/wrong", { method: "PUT", body: { exam, qids: [...selected] } });
+          if (--pending === 0) setStatus("已自動儲存");
+        } catch (ex) {
+          pending--;
+          setStatus(`儲存失敗：${ex.message}（再點一次題號重試）`, true);
+        }
+      });
+    };
+
+    const renderList = () => {
+      const wrongQs = qs.filter((q) => selected.has(q.id));
+      listBox.replaceChildren(wrongQs.length
+        ? h("div", { class: "card" }, wrongQs.map((q) => {
+            const a = attemptOf(q.id);
+            const tag = a?.done ? h("span", { class: "tag ok" }, "已診斷") : a ? h("span", { class: "tag warn" }, "進行中") : h("span", { class: "tag" }, "未診斷");
+            return h("div", { class: "qitem" },
+              h("span", { class: "num" }, `${q.number}`),
+              h("div", { class: "info" }, h("div", {}, subjectTag(q.subject), " ", q.topic), h("div", { class: "muted" }, q.chapter)),
+              tag,
+              h("button", { class: "small", onclick: async () => { await saving; location.hash = `#q/${q.id}`; } }, a?.done ? "查看" : a ? "繼續" : "開始"));
+          }))
+        : h("p", { class: "muted" }, "還沒有選錯題。在上面點選題號，選好的題目會出現在這裡。"));
+    };
+
     const grid = h("div", { class: "grid" },
       qs.map((q) => {
         const b = h("button", {
@@ -163,62 +199,35 @@
           onclick: () => {
             selected.has(q.id) ? selected.delete(q.id) : selected.add(q.id);
             b.setAttribute("aria-pressed", String(selected.has(q.id)));
-            dirty = true;
-            refreshCount();
+            S.state.wrong = [...selected];
+            renderList();
+            save();
           },
         }, q.number);
         return b;
       }));
-    saveBtn.onclick = async () => {
-      const done = busy(saveBtn, "儲存中…");
-      try {
-        await api("/api/wrong", { method: "PUT", body: { exam: S.exam, qids: [...selected] } });
-        await viewHome(true);
-      } catch (ex) {
-        alert(ex.message);
-        done();
-      }
-    };
-    refreshCount();
+    setStatus("");
+    renderList();
 
     const legend = h("div", { class: "legend" },
       Object.entries({ 物理: "--phy", 化學: "--chem", 生物: "--bio", 地科: "--earth" }).map(([n, v]) => h("span", {}, h("i", { style: `background:var(${v})` }), n)));
 
-    const wrongQs = qs.filter((q) => S.state.wrong.includes(q.id));
-    const list = wrongQs.length
-      ? h("div", { class: "card" }, wrongQs.map((q) => {
-          const a = attemptOf(q.id);
-          const status = a?.done ? h("span", { class: "tag ok" }, "已診斷") : a ? h("span", { class: "tag warn" }, "進行中") : h("span", { class: "tag" }, "未診斷");
-          return h("div", { class: "qitem" },
-            h("span", { class: "num" }, `${q.number}`),
-            h("div", { class: "info" }, h("div", {}, subjectTag(q.subject), " ", q.topic), h("div", { class: "muted" }, q.chapter)),
-            status,
-            h("button", { class: "small", onclick: () => (location.hash = `#q/${q.id}`) }, a?.done ? "查看" : a ? "繼續" : "開始"));
-        }))
-      : h("p", { class: "muted" }, "還沒有儲存錯題。先在上面點選題號，再按「儲存錯題」。");
-
-    const listTitle = h("h2", {}, "二、逐題診斷");
     const doneCount = S.state.attempts.filter((a) => a.done).length;
     app.replaceChildren(
       tabs,
       h("h2", {}, "一、點選你答錯的題號"),
-      h("p", { class: "muted" }, "猜對的題目也建議點進來——猜對不代表會。"),
+      h("p", { class: "muted" }, "點一下選取，再點一下取消，選好會自動儲存。猜對的題目也建議選進來——猜對不代表會。"),
       legend, grid,
-      h("div", { class: "row savebar" }, count, h("span", { class: "spacer" }), saveBtn),
+      h("div", { class: "row savebar" }, status, h("span", { class: "spacer" }), goBtn),
       listTitle,
-      justSaved ? h("p", { class: "tag ok", role: "status" }, wrongQs.length ? `已儲存 ${wrongQs.length} 題錯題，從下面第一題按「開始」` : "已儲存（目前沒有選任何錯題）") : "",
-      list,
+      listBox,
       h("h2", {}, "三、我的弱點與學習計劃"),
       doneCount
         ? h("div", { class: "card" },
-            h("p", {}, `已完成 ${doneCount}／${S.state.wrong.length} 題的診斷。`),
+            h("p", {}, `已完成 ${doneCount} 題的診斷。`),
             h("button", { class: "primary", onclick: () => (location.hash = "#plan") }, S.state.plan ? "查看學習計劃" : "查看弱點分析"))
         : h("p", { class: "muted" }, "完成至少一題的診斷後，這裡會出現你的弱點分析。")
     );
-    if (justSaved) {
-      listTitle.style.scrollMarginTop = "4.5rem";
-      listTitle.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   }
 
   // ---------- 單題診斷 ----------
